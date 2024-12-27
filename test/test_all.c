@@ -3,6 +3,7 @@
 #include <string.h>
 #include "tad_paciente.h"
 #include "tad_fila.h"
+#include "tad_procedimento.h"
 
 void test_inicializa_paciente() {
     printf("=== Teste: inicializa_paciente ===\n");
@@ -85,17 +86,47 @@ void test_fila() {
     printf("Finalizados testes para TAD Fila.\n");
 }
 
+// Teste Procediementos
+void test_procedimento() {
+    printf("=== Teste: TAD Procedimento ===\n");
+
+    Procedimento* triagem = inicializa_procedimento("Triagem", 0.2, 3);
+
+    // Testar alocação de unidades
+    int unidade = aloca_unidade(triagem, 1.0);
+    if (unidade == -1) {
+        printf("Falhou: Nenhuma unidade foi alocada.\n");
+    } else {
+        printf("Passou: Unidade %d alocada.\n", unidade);
+    }
+
+    // Testar liberação de unidade
+    libera_unidade(triagem, unidade, 0.2);
+    if (triagem->unidades[unidade].ocupado) {
+        printf("Falhou: Unidade não foi liberada.\n");
+    } else {
+        printf("Passou: Unidade liberada.\n");
+    }
+
+    // Exibir estado do procedimento
+    exibe_procedimento(triagem);
+
+    // Finalizar procedimento
+    finaliza_procedimento(triagem);
+    printf("Finalizados testes para TAD Procedimento.\n");
+}
+
+
 
 int main() {
     printf("==== Iniciando Testes ====\n");
 
+    // Sequenicia de testes
     test_inicializa_paciente();
     test_atualiza_estado_paciente();
     test_registra_tempo();
-
     test_fila();
-
-    // Novos testes serão adicionados aqui conforme implementamos mais funcionalidades.
+    test_procedimento();
 
     printf("==== Testes Finalizados ====\n");
     return 0;
