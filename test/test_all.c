@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "tad_paciente.h"
+#include "tad_fila.h"
 
 void test_inicializa_paciente() {
     printf("=== Teste: inicializa_paciente ===\n");
@@ -43,12 +44,56 @@ void test_registra_tempo() {
     libera_paciente(paciente);
 }
 
+// Testes Fila
+void test_fila() {
+    printf("=== Teste: TAD Fila ===\n");
+
+    Fila* fila = inicializa_fila();
+
+    // Criar pacientes para teste
+    Paciente* p1 = inicializa_paciente("0001", 0, 2024, 1, 1, 10, 1, 1, 1, 1, 1);
+    Paciente* p2 = inicializa_paciente("0002", 0, 2024, 1, 1, 11, 2, 2, 2, 2, 2);
+
+    // Testar enfileiramento
+    enfileira(fila, p1);
+    enfileira(fila, p2);
+
+    if (fila->tamanho != 2) {
+        printf("Falhou: Tamanho da fila incorreto após enfileirar.\n");
+    } else {
+        printf("Passou: Enfileiramento.\n");
+    }
+
+    // Testar desenfileiramento
+    Paciente* removido = desenfileira(fila);
+    if (removido != p1) {
+        printf("Falhou: Desenfileiramento incorreto.\n");
+    } else {
+        printf("Passou: Desenfileiramento.\n");
+    }
+
+    // Testar fila vazia
+    desenfileira(fila); // Remove o último
+    if (!fila_vazia(fila)) {
+        printf("Falhou: Fila deveria estar vazia.\n");
+    } else {
+        printf("Passou: Verificação de fila vazia.\n");
+    }
+
+    // Finalizar fila
+    finaliza_fila(fila);
+    printf("Finalizados testes para TAD Fila.\n");
+}
+
+
 int main() {
     printf("==== Iniciando Testes ====\n");
 
     test_inicializa_paciente();
     test_atualiza_estado_paciente();
     test_registra_tempo();
+
+    test_fila();
 
     // Novos testes serão adicionados aqui conforme implementamos mais funcionalidades.
 
