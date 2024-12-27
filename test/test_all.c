@@ -4,48 +4,45 @@
 #include "tad_paciente.h"
 #include "tad_fila.h"
 #include "tad_procedimento.h"
+#include "tad_escalonador.h"
 
-void test_inicializa_paciente() {
-    printf("=== Teste: inicializa_paciente ===\n");
+// Testes para TAD Paciente
+void test_paciente() {
+    printf("=== Teste: TAD Paciente ===\n");
+
+    // Teste de inicialização
     Paciente* paciente = inicializa_paciente("1234567890", 1, 2024, 12, 27, 15, 2, 5, 3, 2, 1);
     if (paciente == NULL) {
         printf("Falhou: Paciente não inicializado corretamente.\n");
-        return;
-    }
-    if (strcmp(paciente->identificador, "1234567890") != 0 || paciente->grau_urgencia != 2) {
+    } else if (strcmp(paciente->identificador, "1234567890") != 0 || paciente->grau_urgencia != 2) {
         printf("Falhou: Dados do paciente estão incorretos.\n");
     } else {
-        printf("Passou.\n");
+        printf("Passou: Inicialização do paciente.\n");
     }
-    libera_paciente(paciente);
-}
 
-void test_atualiza_estado_paciente() {
-    printf("=== Teste: atualiza_estado_paciente ===\n");
-    Paciente* paciente = inicializa_paciente("1234567890", 1, 2024, 12, 27, 15, 2, 5, 3, 2, 1);
+    // Teste de atualização de estado
     atualiza_estado_paciente(paciente, 3);
     if (paciente->estado_atual != 3) {
         printf("Falhou: Estado do paciente não atualizado corretamente.\n");
     } else {
-        printf("Passou.\n");
+        printf("Passou: Atualização de estado.\n");
     }
-    libera_paciente(paciente);
-}
 
-void test_registra_tempo() {
-    printf("=== Teste: registra_tempo ===\n");
-    Paciente* paciente = inicializa_paciente("1234567890", 1, 2024, 12, 27, 15, 2, 5, 3, 2, 1);
+    // Teste de registro de tempos
     registra_tempo_espera(paciente, 1.5);
     registra_tempo_atendimento(paciente, 2.0);
     if (paciente->tempo_espera != 1.5 || paciente->tempo_atendimento != 2.0) {
         printf("Falhou: Tempo de espera ou atendimento não registrado corretamente.\n");
     } else {
-        printf("Passou.\n");
+        printf("Passou: Registro de tempos.\n");
     }
+
+    // Liberar memória do paciente
     libera_paciente(paciente);
+    printf("Finalizados testes para TAD Paciente.\n");
 }
 
-// Testes Fila
+// Testes para TAD Fila
 void test_fila() {
     printf("=== Teste: TAD Fila ===\n");
 
@@ -86,7 +83,7 @@ void test_fila() {
     printf("Finalizados testes para TAD Fila.\n");
 }
 
-// Teste Procediementos
+// Testes para TAD Procedimento
 void test_procedimento() {
     printf("=== Teste: TAD Procedimento ===\n");
 
@@ -116,17 +113,44 @@ void test_procedimento() {
     printf("Finalizados testes para TAD Procedimento.\n");
 }
 
+// Testes para TAD Escalonador
+void test_escalonador() {
+    printf("=== Teste: TAD Escalonador ===\n");
 
+    Escalonador* escalonador = inicializa_escalonador(5);
+
+    // Testar inserção de eventos
+    insere_evento(escalonador, 2.0, 1, NULL);
+    insere_evento(escalonador, 1.0, 2, NULL);
+    insere_evento(escalonador, 3.0, 3, NULL);
+
+    Evento evento = remove_proximo_evento(escalonador);
+    if (evento.tempo != 1.0) {
+        printf("Falhou: Evento removido está fora de ordem.\n");
+    } else {
+        printf("Passou: Ordem de prioridade.\n");
+    }
+
+    // Testar se o escalonador está vazio
+    remove_proximo_evento(escalonador);
+    remove_proximo_evento(escalonador);
+    if (!escalonador_vazio(escalonador)) {
+        printf("Falhou: Escalonador deveria estar vazio.\n");
+    } else {
+        printf("Passou: Verificação de escalonador vazio.\n");
+    }
+
+    finaliza_escalonador(escalonador);
+    printf("Finalizados testes para TAD Escalonador.\n");
+}
 
 int main() {
     printf("==== Iniciando Testes ====\n");
 
-    // Sequenicia de testes
-    test_inicializa_paciente();
-    test_atualiza_estado_paciente();
-    test_registra_tempo();
+    test_paciente();
     test_fila();
     test_procedimento();
+    test_escalonador();
 
     printf("==== Testes Finalizados ====\n");
     return 0;
