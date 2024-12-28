@@ -74,3 +74,22 @@ void finaliza_procedimento(Procedimento* procedimento) {
         free(procedimento);
     }
 }
+
+int unidade_disponivel(Procedimento* procedimento) {
+    for (int i = 0; i < procedimento->num_unidades; i++) {
+        if (!procedimento->unidades[i].ocupado) {
+            return 1; // Há unidade disponível
+        }
+    }
+    return 0; // Todas as unidades estão ocupadas
+}
+
+void registra_ocupacao(Procedimento* procedimento, int unidade, double tempo_inicio, double duracao) {
+    if (unidade < 0 || unidade >= procedimento->num_unidades) {
+        fprintf(stderr, "Erro: Unidade inválida.\n");
+        return;
+    }
+    procedimento->unidades[unidade].ocupado = 1;
+    procedimento->unidades[unidade].tempo_ocioso += (tempo_inicio - procedimento->unidades[unidade].tempo_ocupado);
+    procedimento->unidades[unidade].tempo_ocupado += duracao;
+}
