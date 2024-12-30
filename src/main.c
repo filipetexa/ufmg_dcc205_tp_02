@@ -28,9 +28,7 @@ Procedimento *medicamentos;
 double relogio = 0.0;
 Escalonador *escalonador;
 
-
-Paciente** Pacientes; // Array de ponteiros para os pacientes
-
+Paciente **Pacientes; // Array de ponteiros para os pacientes
 
 /**
  * Inicializa todas as filas necessárias para a simulação.
@@ -64,24 +62,23 @@ void inicializa_filas()
  * Finaliza todas as filas da simulação.
  * - Libera a memória de todas as filas criadas.
  */
-void inicializa_filas()
+void finaliza_filas()
 {
+    // Finaliza a fila de triagem
+    finaliza_fila(fila_triagem);
 
-    // Inicializa fila de triagem
-    fila_triagem = inicializa_fila();
-
-    // Atendimento inicial: vermelho, amarelo, verde
+    // Finaliza as filas de atendimento inicial
     for (int i = 0; i < 3; i++)
-    {
-        fila_atendimento[i] = inicializa_fila();
+    { // Vermelho, Amarelo, Verde
+        finaliza_fila(fila_atendimento[i]);
     }
 
-    // Procedimentos (medidas, testes, imagens, medicamentos)
+    // Finaliza as filas de procedimentos
     for (int proc = 0; proc < 4; proc++)
-    {
+    { // Procedimentos: Medidas, Testes, Imagem, Medicamentos
         for (int prioridade = 0; prioridade < 3; prioridade++)
-        {
-            fila_procedimentos[proc][prioridade] = inicializa_fila();
+        { // Vermelho, Amarelo, Verde
+            finaliza_fila(fila_procedimentos[proc][prioridade]);
         }
     }
 }
@@ -116,28 +113,33 @@ void carrega_parametros(const char *caminho_arquivo)
     fclose(arquivo);
 }
 
-void inicializa_pacientes(const char* caminho_arquivo) {
-    FILE* arquivo = fopen(caminho_arquivo, "r");
-    if (!arquivo) {
+void inicializa_pacientes(const char *caminho_arquivo)
+{
+    FILE *arquivo = fopen(caminho_arquivo, "r");
+    if (!arquivo)
+    {
         fprintf(stderr, "Erro ao abrir o arquivo: %s\n", caminho_arquivo);
         exit(EXIT_FAILURE);
     }
 
     // Pula os parâmetros iniciais já lidos
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 6; i++)
+    {
         fscanf(arquivo, "%*f %*d"); // Ignora tempos e unidades
     }
     fscanf(arquivo, "%*d"); // Ignora o número de pacientes
 
     // Aloca o array de ponteiros para pacientes
-    Pacientes = (Paciente**)malloc(num_pacientes * sizeof(Paciente*));
-    if (Pacientes == NULL) {
+    Pacientes = (Paciente **)malloc(num_pacientes * sizeof(Paciente *));
+    if (Pacientes == NULL)
+    {
         fprintf(stderr, "Erro ao alocar memória para o array de pacientes.\n");
         exit(EXIT_FAILURE);
     }
 
     // Lê os dados dos pacientes e inicializa eventos de chegada
-    for (int i = 0; i < num_pacientes; i++) {
+    for (int i = 0; i < num_pacientes; i++)
+    {
         char id[11];
         int alta, ano, mes, dia, hora, grau, medidas, testes, exames, medicamentos;
 
@@ -156,7 +158,6 @@ void inicializa_pacientes(const char* caminho_arquivo) {
 
     fclose(arquivo);
 }
-
 
 int determina_proximo_procedimento(Paciente *paciente)
 {
@@ -189,7 +190,7 @@ int determina_proximo_procedimento(Paciente *paciente)
 void processa_eventos()
 {
     // Enquanto houver eventos no escalonador ou filas não estiverem vazias
-    while (!escalonador_vazio(escalonador) || !todas_filas_vazias())
+    while (!escalonador_vazio(escalonador))
     {
         // Remove o próximo evento do escalonador
         Evento evento = remove_proximo_evento(escalonador);
@@ -220,40 +221,36 @@ void processa_eventos()
 
             break;
 
-        case 3: // Sendo triado -> Triagem concluída
-            // Libera a unidade de triagem
-            libera_unidade(triagem, relogio);
+case 3: // Sendo triado -> Triagem concluída
+    // Atualiza o tempo de atendimento
+    paciente->tempo_atendimento += triagem->tempo_medio;
 
-            // Move o paciente atual para o próximo estado
-            if (aloca_unidade(atendimento))
-            {
-                // Espaço disponível no atendimento: escalona o término do atendimento
-                insere_evento(escalonador, relogio + atendimento->tempo_medio, 5, paciente); // Tipo 5: Atendimento concluído
-                paciente->estado_atual = 5;                                                  // Estado: Sendo atendido
-            }
-            else
-            {
-                // Sem espaço no atendimento: enfileira o paciente
-                enfileira(fila_atendimento[paciente->grau_urgencia], paciente); // Usa a prioridade do paciente
-                paciente->estado_atual = 4;                                     // Estado: Na fila de atendimento
-            }
+    // Libera a unidade de triagem
+    libera_unidade(triagem, relogio);
 
-            // Verifica se há pacientes aguardando na fila de triagem
-            if (!fila_vazia(fila_triagem))
-            {
-                // Remove o próximo paciente da fila
-                Paciente *proximo_paciente = desenfileira(fila_triagem);
+    // Move o paciente atual para o próximo estado
+    if (aloca_unidade(atendimento)) {
+        // Espaço disponível no atendimento: escalona o término do atendimento
+        insere_evento(escalonador, relogio + atendimento->tempo_medio, 5, paciente); // Tipo 5: Atendimento concluído
+        paciente->estado_atual = 5; // Estado: Sendo atendido
+    } else {
+        // Sem espaço no atendimento: enfileira o paciente
+        paciente_entra_fila(paciente, fila_atendimento[paciente->grau_urgencia], relogio);
+        paciente->estado_atual = 4; // Estado: Na fila de atendimento
+    }
 
-                // Atualiza o tempo de espera do próximo paciente
-                proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora);
+    // Verifica se há pacientes aguardando na fila de triagem
+    if (!fila_vazia(fila_triagem)) {
+        // Remove o próximo paciente da fila
+        Paciente* proximo_paciente = paciente_sai_fila(fila_triagem, relogio);
 
-                // Aloca a unidade de triagem e escalona um evento para término
-                aloca_unidade(triagem);
-                insere_evento(escalonador, relogio + triagem->tempo_medio, 3, proximo_paciente); // Tipo 3: Triagem concluída
-                proximo_paciente->estado_atual = 3;                                              // Estado: Sendo triado
-            }
+        // Aloca a unidade de triagem e escalona um evento para término
+        aloca_unidade(triagem);
+        insere_evento(escalonador, relogio + triagem->tempo_medio, 3, proximo_paciente); // Tipo 3: Triagem concluída
+        proximo_paciente->estado_atual = 3; // Estado: Sendo triado
+    }
 
-            break;
+    break;
 
         case 5: // Sendo atendido -> Atendimento concluído
             // Libera a unidade de atendimento
@@ -298,7 +295,7 @@ void processa_eventos()
                 // Aloca unidade ou coloca na fila
                 if (aloca_unidade(procedimento))
                 {
-                    insere_evento(escalonador, relogio + procedimento->tempo_medio, proximo_estado + 1, paciente);
+                    insere_evento(escalonador, relogio + procedimento->tempo_medio * paciente->medidas_hospitalares, proximo_estado + 1, paciente);
                     paciente->estado_atual = proximo_estado + 1; // Estado: Realizando o procedimento
                 }
                 else
@@ -335,7 +332,7 @@ void processa_eventos()
             libera_unidade(medidas, relogio);
 
             // Determina o próximo estado do paciente
-            int proximo_estado = determina_proximo_procedimento(paciente);
+            proximo_estado = determina_proximo_procedimento(paciente);
 
             if (proximo_estado == 14)
             {
@@ -348,8 +345,8 @@ void processa_eventos()
                 if (aloca_unidade(testes))
                 {
                     // Unidade disponível: Escalona o término do procedimento
-                    insere_evento(escalonador, relogio + testes->tempo_medio, 9, paciente); // Tipo 9: Testes concluídos
-                    paciente->estado_atual = 9;                                             // Estado: Realizando testes laboratoriais
+                    insere_evento(escalonador, relogio + testes->tempo_medio * paciente->testes_laboratorio, 9, paciente); // Tipo 9: Testes concluídos
+                    paciente->estado_atual = 9;                                                                            // Estado: Realizando testes laboratoriais
                 }
                 else
                 {
@@ -367,8 +364,8 @@ void processa_eventos()
                     Paciente *proximo_paciente = desenfileira(fila_procedimentos[0][prioridade]);
                     proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora); // Atualiza o tempo de espera
                     aloca_unidade(medidas);
-                    insere_evento(escalonador, relogio + medidas->tempo_medio, 7, proximo_paciente); // Tipo 7: Medidas concluídas
-                    proximo_paciente->estado_atual = 7;                                              // Estado: Realizando medidas hospitalares
+                    insere_evento(escalonador, relogio + medidas->tempo_medio * paciente->medidas_hospitalares, 7, proximo_paciente); // Tipo 7: Medidas concluídas
+                    proximo_paciente->estado_atual = 7;                                                                               // Estado: Realizando medidas hospitalares
                     break;
                 }
             }
@@ -380,7 +377,7 @@ void processa_eventos()
             libera_unidade(testes, relogio);
 
             // Determina o próximo estado do paciente
-            int proximo_estado = determina_proximo_procedimento(paciente);
+            proximo_estado = determina_proximo_procedimento(paciente);
 
             if (proximo_estado == 14)
             {
@@ -392,8 +389,8 @@ void processa_eventos()
                 // Próximo procedimento: Exames de imagem
                 if (aloca_unidade(imagem))
                 {
-                    insere_evento(escalonador, relogio + imagem->tempo_medio, 11, paciente); // Tipo 11: Exames concluídos
-                    paciente->estado_atual = 11;                                             // Estado: Realizando exames de imagem
+                    insere_evento(escalonador, relogio + imagem->tempo_medio * paciente->exames_imagem, 11, paciente); // Tipo 11: Exames concluídos
+                    paciente->estado_atual = 11;                                                                       // Estado: Realizando exames de imagem
                 }
                 else
                 {
@@ -410,8 +407,8 @@ void processa_eventos()
                     Paciente *proximo_paciente = desenfileira(fila_procedimentos[1][prioridade]);
                     proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora);
                     aloca_unidade(testes);
-                    insere_evento(escalonador, relogio + testes->tempo_medio, 9, proximo_paciente); // Tipo 9: Testes concluídos
-                    proximo_paciente->estado_atual = 9;                                             // Estado: Realizando testes laboratoriais
+                    insere_evento(escalonador, relogio + testes->tempo_medio * paciente->testes_laboratorio, 9, proximo_paciente); // Tipo 9: Testes concluídos
+                    proximo_paciente->estado_atual = 9;                                                                            // Estado: Realizando testes laboratoriais
                     break;
                 }
             }
@@ -423,7 +420,7 @@ void processa_eventos()
             libera_unidade(imagem, relogio);
 
             // Determina o próximo estado do paciente
-            int proximo_estado = determina_proximo_procedimento(paciente);
+            proximo_estado = determina_proximo_procedimento(paciente);
 
             if (proximo_estado == 14)
             {
@@ -436,8 +433,8 @@ void processa_eventos()
                 if (aloca_unidade(medicamentos))
                 {
                     // Unidade disponível: Escalona o término do procedimento
-                    insere_evento(escalonador, relogio + medicamentos->tempo_medio, 13, paciente); // Tipo 13: Conclusão
-                    paciente->estado_atual = 13;                                                   // Estado: Realizando instrumentos/medicamentos
+                    insere_evento(escalonador, relogio + medicamentos->tempo_medio * paciente->medidas_hospitalares, 13, paciente); // Tipo 13: Conclusão
+                    paciente->estado_atual = 13;                                                                                    // Estado: Realizando instrumentos/medicamentos
                 }
                 else
                 {
@@ -455,8 +452,8 @@ void processa_eventos()
                     Paciente *proximo_paciente = desenfileira(fila_procedimentos[2][prioridade]);
                     proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora); // Atualiza o tempo de espera
                     aloca_unidade(imagem);
-                    insere_evento(escalonador, relogio + imagem->tempo_medio, 11, proximo_paciente); // Tipo 11: Conclusão
-                    proximo_paciente->estado_atual = 11;                                             // Estado: Realizando exames de imagem
+                    insere_evento(escalonador, relogio + imagem->tempo_medio * paciente->exames_imagem, 11, proximo_paciente); // Tipo 11: Conclusão
+                    proximo_paciente->estado_atual = 11;                                                                       // Estado: Realizando exames de imagem
                     break;
                 }
             }
@@ -468,7 +465,7 @@ void processa_eventos()
             libera_unidade(medicamentos, relogio);
 
             // Determina o próximo estado do paciente
-            int proximo_estado = determina_proximo_procedimento(paciente);
+            proximo_estado = determina_proximo_procedimento(paciente);
 
             if (proximo_estado == 14)
             {
@@ -489,8 +486,8 @@ void processa_eventos()
                     Paciente *proximo_paciente = desenfileira(fila_procedimentos[3][prioridade]);
                     proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora); // Atualiza o tempo de espera
                     aloca_unidade(medicamentos);
-                    insere_evento(escalonador, relogio + medicamentos->tempo_medio, 13, proximo_paciente); // Tipo 13: Conclusão
-                    proximo_paciente->estado_atual = 13;                                                   // Estado: Realizando instrumentos/medicamentos
+                    insere_evento(escalonador, relogio + medicamentos->tempo_medio * paciente->medidas_hospitalares, 13, proximo_paciente); // Tipo 13: Conclusão
+                    proximo_paciente->estado_atual = 13;                                                                                    // Estado: Realizando instrumentos/medicamentos
                     break;
                 }
             }
@@ -500,7 +497,6 @@ void processa_eventos()
         default:
             fprintf(stderr, "Erro: Estado inválido do paciente %s.\n", paciente->identificador);
         }
-
     }
 }
 
@@ -509,16 +505,16 @@ void processa_eventos()
  * - Mostra os dados de cada paciente que obteve alta.
  * - Exibe estatísticas gerais baseadas nas filas e procedimentos.
  */
-#include <time.h>
-
-void gera_saida() {
+void gera_saida()
+{
     // Cabeçalho da tabela
-    printf("ID           Admissão               Alta                 Tempo Total   Tempo Atendimento   Tempo Espera\n");
-    printf("----------------------------------------------------------------------------------------------------------\n");
+    printf("ID           Admissão               Alta                 Tempo Total (h)   Tempo Atendimento (h)   Tempo Espera (h)\n");
+    printf("---------------------------------------------------------------------------------------------------------------\n");
 
     // Percorre todos os pacientes no array global
-    for (int i = 0; i < num_pacientes; i++) {
-        Paciente* paciente = Pacientes[i]; // Acessa o paciente diretamente no array
+    for (int i = 0; i < num_pacientes; i++)
+    {
+        Paciente *paciente = Pacientes[i]; // Acessa o paciente diretamente no array
 
         // Calcula o tempo total no hospital
         double tempo_total = paciente->tempo_atendimento + paciente->tempo_espera;
@@ -538,7 +534,7 @@ void gera_saida() {
         // Converte o tempo total para segundos e adiciona à data de admissão
         time_t tempo_em_segundos = (time_t)(tempo_total * 3600); // Tempo total em segundos
         time_t data_alta_em_segundos = mktime(&data_alta) + tempo_em_segundos;
-        struct tm* data_alta_calculada = localtime(&data_alta_em_segundos);
+        struct tm *data_alta_calculada = localtime(&data_alta_em_segundos);
 
         // Formata a data de alta
         char data_alta_formatada[20];
@@ -551,7 +547,7 @@ void gera_saida() {
                  data_alta_calculada->tm_sec);
 
         // Imprime os dados formatados para o paciente
-        printf("%-12s %-20s %-20s %-12.2f %-18.2f %-12.2f\n",
+        printf("%-12s %-20s %-20s %-17.3f %-24.3f %-18.3f\n",
                paciente->identificador, data_admissao, data_alta_formatada,
                tempo_total, paciente->tempo_atendimento, paciente->tempo_espera);
     }
@@ -605,7 +601,8 @@ int main(int argc, char *argv[])
     finaliza_procedimento(medicamentos);
 
     // Libera o array de pacientes
-    for (int i = 0; i < num_pacientes; i++) {
+    for (int i = 0; i < num_pacientes; i++)
+    {
         libera_paciente(Pacientes[i]);
     }
     free(Pacientes);

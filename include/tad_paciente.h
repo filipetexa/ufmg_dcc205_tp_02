@@ -22,6 +22,7 @@ typedef struct {
     int estado_atual;      // Estado atual do paciente
     double tempo_espera;   // Tempo total de espera
     double tempo_atendimento; // Tempo total em atendimento
+    double hora_entrada_fila; // Horário de entrada na fila atual
 } Paciente;
 
 // Funções para manipulação de pacientes

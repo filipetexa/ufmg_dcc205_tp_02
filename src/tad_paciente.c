@@ -1,4 +1,5 @@
 #include "tad_paciente.h"
+#include "tad_fila.h"
 
 // Função para inicializar um paciente
 Paciente* inicializa_paciente(char* id, int alta, int ano, int mes, int dia, int hora, int grau,
@@ -50,6 +51,31 @@ void libera_paciente(Paciente* paciente) {
         free(paciente);
     }
 }
+
+void paciente_entra_fila(Paciente* paciente, Fila* fila, double horario_atual) {
+    // Seta o horário de entrada na fila
+    paciente->hora_entrada_fila = horario_atual;
+
+    // Insere o paciente na fila
+    enfileira(fila, paciente);
+}
+
+Paciente* paciente_sai_fila(Fila* fila, double horario_atual) {
+    // Remove o paciente da fila
+    Paciente* paciente = desenfileira(fila);
+
+    // Calcula o tempo de espera
+    if (paciente->hora_entrada_fila > 0) {
+        double tempo_espera_na_fila = horario_atual - paciente->hora_entrada_fila;
+        paciente->tempo_espera += tempo_espera_na_fila;
+
+        // Reseta o horário de entrada na fila
+        paciente->hora_entrada_fila = 0.0;
+    }
+
+    return paciente;
+}
+
 
 // Exibe informações de um paciente
 void exibe_paciente(const Paciente* paciente) {
