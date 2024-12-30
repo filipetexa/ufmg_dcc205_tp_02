@@ -6,30 +6,23 @@
 #include <string.h>
 #include "tad_fila.h"
 
-// Estrutura de uma unidade de serviço
+// Estrutura de Procedimento
 typedef struct {
-    int ocupado;      // 0: ocioso, 1: ocupado
-    double tempo_ocioso; // Tempo total ocioso
-    double tempo_ocupado; // Tempo total ocupado
-} Unidade;
-
-typedef struct {
-    char nome[50];
-    double tempo_medio;
-    int num_unidades;
-    Unidade* unidades;  
-    Fila* fila;         
-    int total_atendimentos;
+    char nome[50];          // Nome do procedimento
+    double tempo_medio;     // Tempo médio por unidade (em horas)
+    int unidades_totais;    // Número total de unidades
+    int unidades_ocupadas;  // Número de unidades atualmente ocupadas
+    double tempo_ocupado;   // Tempo total de ocupação (estatísticas)
+    double tempo_ocioso;    // Tempo total ocioso (estatísticas)
+    Fila* fila;             // Fila de espera associada ao procedimento
 } Procedimento;
 
-
-// Funções para manipulação de procedimentos
-Procedimento* inicializa_procedimento(const char* nome, double tempo_medio, int num_unidades);
-int aloca_unidade(Procedimento* procedimento, double tempo_atual);
-void libera_unidade(Procedimento* procedimento, int unidade, double tempo_atual);
+// Funções para manipulação de Procedimentos
+Procedimento* inicializa_procedimento(const char* nome, double tempo_medio, int unidades_totais);
+int aloca_unidade(Procedimento* procedimento);
+void libera_unidade(Procedimento* procedimento, double tempo_duracao);
+void atualiza_tempo_ocioso(Procedimento* procedimento, double tempo_atual);
 void exibe_procedimento(const Procedimento* procedimento);
 void finaliza_procedimento(Procedimento* procedimento);
-int unidade_disponivel(Procedimento* procedimento);
-void registra_ocupacao(Procedimento* procedimento, int unidade, double tempo_inicio, double duracao);
 
 #endif

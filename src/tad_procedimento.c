@@ -1,95 +1,66 @@
 #include "tad_procedimento.h"
 
-// Inicializa um procedimento
-Procedimento* inicializa_procedimento(const char* nome, double tempo_medio, int num_unidades) {
+// Inicializa um Procedimento
+Procedimento* inicializa_procedimento(const char* nome, double tempo_medio, int unidades_totais) {
     Procedimento* procedimento = (Procedimento*)malloc(sizeof(Procedimento));
-    if (procedimento == NULL) {
-        fprintf(stderr, "Erro ao alocar memória para procedimento.\n");
+    if (!procedimento) {
+        fprintf(stderr, "Erro ao alocar memória para o Procedimento.\n");
         exit(EXIT_FAILURE);
     }
 
     strncpy(procedimento->nome, nome, 49);
     procedimento->nome[49] = '\0';
     procedimento->tempo_medio = tempo_medio;
-    procedimento->num_unidades = num_unidades;
-    procedimento->unidades = (Unidade*)malloc(num_unidades * sizeof(Unidade));
+    procedimento->unidades_totais = unidades_totais;
+    procedimento->unidades_ocupadas = 0;
+    procedimento->tempo_ocupado = 0.0;
+    procedimento->tempo_ocioso = 0.0;
+    procedimento->fila = inicializa_fila();
 
-    if (procedimento->unidades == NULL) {
-        fprintf(stderr, "Erro ao alocar memória para unidades do procedimento.\n");
-        free(procedimento);
-        exit(EXIT_FAILURE);
-    }
-
-    for (int i = 0; i < num_unidades; i++) {
-        procedimento->unidades[i].ocupado = 0;
-        procedimento->unidades[i].tempo_ocioso = 0.0;
-        procedimento->unidades[i].tempo_ocupado = 0.0;
-    }
-
-    procedimento->total_atendimentos = 0;
     return procedimento;
 }
 
-// Aloca uma unidade para atender um paciente
-int aloca_unidade(Procedimento* procedimento, double tempo_atual) {
-    for (int i = 0; i < procedimento->num_unidades; i++) {
-        if (!procedimento->unidades[i].ocupado) {
-            procedimento->unidades[i].ocupado = 1;
-            procedimento->unidades[i].tempo_ocioso += tempo_atual;
-            procedimento->total_atendimentos++;
-            return i; // Retorna o índice da unidade alocada
-        }
+// Aloca uma unidade, se disponível
+int aloca_unidade(Procedimento* procedimento) {
+    if (procedimento->unidades_ocupadas < procedimento->unidades_totais) {
+        procedimento->unidades_ocupadas++;
+        return 1; // Unidade alocada com sucesso
     }
-    return -1; // Nenhuma unidade disponível
+    return 0; // Nenhuma unidade disponível
 }
 
-// Libera uma unidade após atendimento
-void libera_unidade(Procedimento* procedimento, int unidade, double tempo_atual) {
-    if (unidade < 0 || unidade >= procedimento->num_unidades) {
-        fprintf(stderr, "Erro: Unidade inválida.\n");
-        return;
+// Libera uma unidade após o atendimento
+void libera_unidade(Procedimento* procedimento, double tempo_duracao) {
+    if (procedimento->unidades_ocupadas > 0) {
+        procedimento->unidades_ocupadas--;
+        procedimento->tempo_ocupado += tempo_duracao;
+    } else {
+        fprintf(stderr, "Erro: Tentativa de liberar unidade inexistente.\n");
     }
-    procedimento->unidades[unidade].ocupado = 0;
-    procedimento->unidades[unidade].tempo_ocupado += tempo_atual;
 }
 
-// Exibe informações do procedimento
+// Atualiza o tempo ocioso com base no tempo atual
+void atualiza_tempo_ocioso(Procedimento* procedimento, double tempo_atual) {
+    double unidades_ociosas = procedimento->unidades_totais - procedimento->unidades_ocupadas;
+    procedimento->tempo_ocioso += unidades_ociosas * tempo_atual;
+}
+
+// Exibe informações sobre o Procedimento
 void exibe_procedimento(const Procedimento* procedimento) {
     printf("Procedimento: %s\n", procedimento->nome);
-    printf("Tempo médio: %.2f\n", procedimento->tempo_medio);
-    printf("Número de unidades: %d\n", procedimento->num_unidades);
-    printf("Total de atendimentos: %d\n", procedimento->total_atendimentos);
-    for (int i = 0; i < procedimento->num_unidades; i++) {
-        printf("Unidade %d - Ocupado: %d, Tempo Ocioso: %.2f, Tempo Ocupado: %.2f\n",
-               i, procedimento->unidades[i].ocupado,
-               procedimento->unidades[i].tempo_ocioso,
-               procedimento->unidades[i].tempo_ocupado);
-    }
+    printf("Tempo médio: %.2f horas\n", procedimento->tempo_medio);
+    printf("Unidades totais: %d\n", procedimento->unidades_totais);
+    printf("Unidades ocupadas: %d\n", procedimento->unidades_ocupadas);
+    printf("Tempo total ocupado: %.2f horas\n", procedimento->tempo_ocupado);
+    printf("Tempo total ocioso: %.2f horas\n", procedimento->tempo_ocioso);
+    printf("Fila de espera:\n");
+    exibe_fila(procedimento->fila);
 }
 
-// Finaliza o procedimento e libera a memória
+// Finaliza e libera memória do Procedimento
 void finaliza_procedimento(Procedimento* procedimento) {
-    if (procedimento != NULL) {
-        free(procedimento->unidades);
+    if (procedimento) {
+        finaliza_fila(procedimento->fila);
         free(procedimento);
     }
-}
-
-int unidade_disponivel(Procedimento* procedimento) {
-    for (int i = 0; i < procedimento->num_unidades; i++) {
-        if (!procedimento->unidades[i].ocupado) {
-            return 1; // Há unidade disponível
-        }
-    }
-    return 0; // Todas as unidades estão ocupadas
-}
-
-void registra_ocupacao(Procedimento* procedimento, int unidade, double tempo_inicio, double duracao) {
-    if (unidade < 0 || unidade >= procedimento->num_unidades) {
-        fprintf(stderr, "Erro: Unidade inválida.\n");
-        return;
-    }
-    procedimento->unidades[unidade].ocupado = 1;
-    procedimento->unidades[unidade].tempo_ocioso += (tempo_inicio - procedimento->unidades[unidade].tempo_ocupado);
-    procedimento->unidades[unidade].tempo_ocupado += duracao;
 }

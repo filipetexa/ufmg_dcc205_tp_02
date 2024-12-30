@@ -7,6 +7,7 @@
 
 // Estrutura para armazenar informações de um paciente
 typedef struct {
+    
     char identificador[11]; // Identificador único
     int alta;              // 0: Não teve alta, 1: Teve alta
     int ano;
@@ -21,7 +22,6 @@ typedef struct {
     int estado_atual;      // Estado atual do paciente
     double tempo_espera;   // Tempo total de espera
     double tempo_atendimento; // Tempo total em atendimento
-    double hora_atual;
 } Paciente;
 
 // Funções para manipulação de pacientes
