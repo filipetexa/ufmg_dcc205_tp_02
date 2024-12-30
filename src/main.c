@@ -221,36 +221,40 @@ void processa_eventos()
 
             break;
 
-case 3: // Sendo triado -> Triagem concluída
-    // Atualiza o tempo de atendimento
-    paciente->tempo_atendimento += triagem->tempo_medio;
+        case 3: // Sendo triado -> Triagem concluída
+            // Atualiza o tempo de atendimento
+            paciente->tempo_atendimento += triagem->tempo_medio;
 
-    // Libera a unidade de triagem
-    libera_unidade(triagem, relogio);
+            // Libera a unidade de triagem
+            libera_unidade(triagem, relogio);
 
-    // Move o paciente atual para o próximo estado
-    if (aloca_unidade(atendimento)) {
-        // Espaço disponível no atendimento: escalona o término do atendimento
-        insere_evento(escalonador, relogio + atendimento->tempo_medio, 5, paciente); // Tipo 5: Atendimento concluído
-        paciente->estado_atual = 5; // Estado: Sendo atendido
-    } else {
-        // Sem espaço no atendimento: enfileira o paciente
-        paciente_entra_fila(paciente, fila_atendimento[paciente->grau_urgencia], relogio);
-        paciente->estado_atual = 4; // Estado: Na fila de atendimento
-    }
+            // Move o paciente atual para o próximo estado
+            if (aloca_unidade(atendimento))
+            {
+                // Espaço disponível no atendimento: escalona o término do atendimento
+                insere_evento(escalonador, relogio + atendimento->tempo_medio, 5, paciente); // Tipo 5: Atendimento concluído
+                paciente->estado_atual = 5;                                                  // Estado: Sendo atendido
+            }
+            else
+            {
+                // Sem espaço no atendimento: enfileira o paciente
+                paciente_entra_fila(paciente, fila_atendimento[paciente->grau_urgencia], relogio);
+                paciente->estado_atual = 4; // Estado: Na fila de atendimento
+            }
 
-    // Verifica se há pacientes aguardando na fila de triagem
-    if (!fila_vazia(fila_triagem)) {
-        // Remove o próximo paciente da fila
-        Paciente* proximo_paciente = paciente_sai_fila(fila_triagem, relogio);
+            // Verifica se há pacientes aguardando na fila de triagem
+            if (!fila_vazia(fila_triagem))
+            {
+                // Remove o próximo paciente da fila
+                Paciente *proximo_paciente = paciente_sai_fila(fila_triagem, relogio);
 
-        // Aloca a unidade de triagem e escalona um evento para término
-        aloca_unidade(triagem);
-        insere_evento(escalonador, relogio + triagem->tempo_medio, 3, proximo_paciente); // Tipo 3: Triagem concluída
-        proximo_paciente->estado_atual = 3; // Estado: Sendo triado
-    }
+                // Aloca a unidade de triagem e escalona um evento para término
+                aloca_unidade(triagem);
+                insere_evento(escalonador, relogio + triagem->tempo_medio, 3, proximo_paciente); // Tipo 3: Triagem concluída
+                proximo_paciente->estado_atual = 3;                                              // Estado: Sendo triado
+            }
 
-    break;
+            break;
 
         case 5: // Sendo atendido -> Atendimento concluído
             // Libera a unidade de atendimento
