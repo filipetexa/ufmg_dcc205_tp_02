@@ -1,4 +1,4 @@
-#include "tad_fila.h"
+#include "tad_paciente_fila.h"
 
 // Inicializa uma fila vazia
 Fila* inicializa_fila() {

@@ -2,8 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "tad_paciente.h"
-#include "tad_fila.h"
+#include "tad_paciente_fila.h"
 #include "tad_escalonador.h"
 #include "tad_procedimento.h"
 
@@ -208,14 +207,19 @@ void processa_eventos()
             // Tenta alocar o paciente diretamente em uma unidade de triagem
             if (aloca_unidade(triagem))
             {
-                // Se há unidade disponível, escalona o evento para o término da triagem
+                // Paciente atendido diretamente
+                // Atualiza o tempo de atendimento
+                paciente->tempo_atendimento += triagem->tempo_medio;
+
+                // Escalona o evento para o término da triagem
                 insere_evento(escalonador, relogio + triagem->tempo_medio, 3, paciente); // Tipo 3: Triagem concluída
                 paciente->estado_atual = 3;                                              // Estado: Sendo triado
             }
             else
             {
-                // Se não há unidade disponível, coloca o paciente na fila de triagem
-                enfileira(fila_triagem, paciente);
+                // Paciente não conseguiu atendimento imediato
+                // Coloca o paciente na fila de triagem
+                paciente_entra_fila(paciente, fila_triagem, relogio);
                 paciente->estado_atual = 2; // Estado: Na fila de triagem
             }
 
@@ -223,7 +227,7 @@ void processa_eventos()
 
         case 3: // Sendo triado -> Triagem concluída
             // Atualiza o tempo de atendimento
-            paciente->tempo_atendimento += triagem->tempo_medio;
+            paciente->tempo_atendimento += atendimento->tempo_medio;
 
             // Libera a unidade de triagem
             libera_unidade(triagem, relogio);
@@ -257,6 +261,9 @@ void processa_eventos()
             break;
 
         case 5: // Sendo atendido -> Atendimento concluído
+            // Atualiza o tempo de atendimento
+            paciente->tempo_atendimento += atendimento->tempo_medio;
+
             // Libera a unidade de atendimento
             libera_unidade(atendimento, relogio);
 
@@ -296,15 +303,21 @@ void processa_eventos()
                     break;
                 }
 
+                // Calcula o tempo total necessário para o próximo procedimento
+                double tempo_procedimento = procedimento->tempo_medio *
+                                            (proximo_estado == 6 ? paciente->medidas_hospitalares : proximo_estado == 8 ? paciente->testes_laboratorio
+                                                                                                : proximo_estado == 10  ? paciente->exames_imagem
+                                                                                                                        : paciente->instrumentos_medicamentos);
+
                 // Aloca unidade ou coloca na fila
                 if (aloca_unidade(procedimento))
                 {
-                    insere_evento(escalonador, relogio + procedimento->tempo_medio * paciente->medidas_hospitalares, proximo_estado + 1, paciente);
+                    insere_evento(escalonador, relogio + tempo_procedimento, proximo_estado + 1, paciente);
                     paciente->estado_atual = proximo_estado + 1; // Estado: Realizando o procedimento
                 }
                 else
                 {
-                    enfileira(fila_procedimento, paciente);
+                    paciente_entra_fila(paciente, fila_procedimento, relogio);
                     paciente->estado_atual = proximo_estado; // Estado: Na fila do procedimento
                 }
             }
@@ -315,10 +328,7 @@ void processa_eventos()
                 if (!fila_vazia(fila_atendimento[prioridade]))
                 {
                     // Remove o paciente da fila de maior prioridade disponível
-                    Paciente *proximo_paciente = desenfileira(fila_atendimento[prioridade]);
-
-                    // Atualiza o tempo de espera do paciente
-                    proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora);
+                    Paciente *proximo_paciente = paciente_sai_fila(fila_atendimento[prioridade], relogio);
 
                     // Aloca a unidade de atendimento e escalona o término do atendimento
                     aloca_unidade(atendimento);
@@ -332,6 +342,9 @@ void processa_eventos()
             break;
 
         case 7: // Realizando medidas hospitalares -> Medidas concluídas
+            // Atualiza o tempo de atendimento
+            paciente->tempo_atendimento += medidas->tempo_medio * paciente->medidas_hospitalares;
+
             // Libera a unidade de medidas hospitalares
             libera_unidade(medidas, relogio);
 
@@ -355,7 +368,7 @@ void processa_eventos()
                 else
                 {
                     // Unidade indisponível: Enfileira o paciente
-                    enfileira(fila_procedimentos[1][paciente->grau_urgencia], paciente);
+                    paciente_entra_fila(paciente, fila_procedimentos[1][paciente->grau_urgencia], relogio);
                     paciente->estado_atual = 8; // Estado: Na fila de testes laboratoriais
                 }
             }
@@ -365,11 +378,13 @@ void processa_eventos()
             {
                 if (!fila_vazia(fila_procedimentos[0][prioridade]))
                 {
-                    Paciente *proximo_paciente = desenfileira(fila_procedimentos[0][prioridade]);
-                    proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora); // Atualiza o tempo de espera
+                    // Remove o próximo paciente da fila
+                    Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[0][prioridade], relogio);
+
+                    // Aloca a unidade e escalona o término do procedimento
                     aloca_unidade(medidas);
-                    insere_evento(escalonador, relogio + medidas->tempo_medio * paciente->medidas_hospitalares, 7, proximo_paciente); // Tipo 7: Medidas concluídas
-                    proximo_paciente->estado_atual = 7;                                                                               // Estado: Realizando medidas hospitalares
+                    insere_evento(escalonador, relogio + medidas->tempo_medio * proximo_paciente->medidas_hospitalares, 7, proximo_paciente); // Tipo 7: Medidas concluídas
+                    proximo_paciente->estado_atual = 7;                                                                                       // Estado: Realizando medidas hospitalares
                     break;
                 }
             }
@@ -377,6 +392,9 @@ void processa_eventos()
             break;
 
         case 9: // Realizando testes laboratoriais -> Testes concluídos
+            // Atualiza o tempo de atendimento
+            paciente->tempo_atendimento += testes->tempo_medio * paciente->testes_laboratorio;
+
             // Libera a unidade de testes laboratoriais
             libera_unidade(testes, relogio);
 
@@ -393,12 +411,14 @@ void processa_eventos()
                 // Próximo procedimento: Exames de imagem
                 if (aloca_unidade(imagem))
                 {
+                    // Unidade disponível: Escalona o término do procedimento
                     insere_evento(escalonador, relogio + imagem->tempo_medio * paciente->exames_imagem, 11, paciente); // Tipo 11: Exames concluídos
                     paciente->estado_atual = 11;                                                                       // Estado: Realizando exames de imagem
                 }
                 else
                 {
-                    enfileira(fila_procedimentos[2][paciente->grau_urgencia], paciente);
+                    // Unidade indisponível: Enfileira o paciente
+                    paciente_entra_fila(paciente, fila_procedimentos[2][paciente->grau_urgencia], relogio);
                     paciente->estado_atual = 10; // Estado: Na fila de exames de imagem
                 }
             }
@@ -408,11 +428,13 @@ void processa_eventos()
             {
                 if (!fila_vazia(fila_procedimentos[1][prioridade]))
                 {
-                    Paciente *proximo_paciente = desenfileira(fila_procedimentos[1][prioridade]);
-                    proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora);
+                    // Remove o próximo paciente da fila
+                    Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[1][prioridade], relogio);
+
+                    // Aloca a unidade e escalona o término do procedimento
                     aloca_unidade(testes);
-                    insere_evento(escalonador, relogio + testes->tempo_medio * paciente->testes_laboratorio, 9, proximo_paciente); // Tipo 9: Testes concluídos
-                    proximo_paciente->estado_atual = 9;                                                                            // Estado: Realizando testes laboratoriais
+                    insere_evento(escalonador, relogio + testes->tempo_medio * proximo_paciente->testes_laboratorio, 9, proximo_paciente); // Tipo 9: Testes concluídos
+                    proximo_paciente->estado_atual = 9;                                                                                    // Estado: Realizando testes laboratoriais
                     break;
                 }
             }
@@ -420,6 +442,9 @@ void processa_eventos()
             break;
 
         case 11: // Realizando exames de imagem -> Exames concluídos
+            // Atualiza o tempo de atendimento
+            paciente->tempo_atendimento += imagem->tempo_medio * paciente->exames_imagem;
+
             // Libera a unidade de exames de imagem
             libera_unidade(imagem, relogio);
 
@@ -437,13 +462,13 @@ void processa_eventos()
                 if (aloca_unidade(medicamentos))
                 {
                     // Unidade disponível: Escalona o término do procedimento
-                    insere_evento(escalonador, relogio + medicamentos->tempo_medio * paciente->medidas_hospitalares, 13, paciente); // Tipo 13: Conclusão
-                    paciente->estado_atual = 13;                                                                                    // Estado: Realizando instrumentos/medicamentos
+                    insere_evento(escalonador, relogio + medicamentos->tempo_medio * paciente->instrumentos_medicamentos, 13, paciente); // Tipo 13: Conclusão
+                    paciente->estado_atual = 13;                                                                                         // Estado: Realizando instrumentos/medicamentos
                 }
                 else
                 {
                     // Unidade indisponível: Enfileira o paciente
-                    enfileira(fila_procedimentos[3][paciente->grau_urgencia], paciente);
+                    paciente_entra_fila(paciente, fila_procedimentos[3][paciente->grau_urgencia], relogio);
                     paciente->estado_atual = 12; // Estado: Na fila de instrumentos/medicamentos
                 }
             }
@@ -453,11 +478,13 @@ void processa_eventos()
             {
                 if (!fila_vazia(fila_procedimentos[2][prioridade]))
                 {
-                    Paciente *proximo_paciente = desenfileira(fila_procedimentos[2][prioridade]);
-                    proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora); // Atualiza o tempo de espera
+                    // Remove o próximo paciente da fila
+                    Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[2][prioridade], relogio);
+
+                    // Aloca a unidade e escalona o término do procedimento
                     aloca_unidade(imagem);
-                    insere_evento(escalonador, relogio + imagem->tempo_medio * paciente->exames_imagem, 11, proximo_paciente); // Tipo 11: Conclusão
-                    proximo_paciente->estado_atual = 11;                                                                       // Estado: Realizando exames de imagem
+                    insere_evento(escalonador, relogio + imagem->tempo_medio * proximo_paciente->exames_imagem, 11, proximo_paciente); // Tipo 11: Conclusão
+                    proximo_paciente->estado_atual = 11;                                                                               // Estado: Realizando exames de imagem
                     break;
                 }
             }
@@ -465,6 +492,9 @@ void processa_eventos()
             break;
 
         case 13: // Realizando instrumentos/medicamentos -> Procedimento concluído
+            // Atualiza o tempo de atendimento
+            paciente->tempo_atendimento += medicamentos->tempo_medio * paciente->instrumentos_medicamentos;
+
             // Libera a unidade de instrumentos/medicamentos
             libera_unidade(medicamentos, relogio);
 
@@ -487,11 +517,13 @@ void processa_eventos()
             {
                 if (!fila_vazia(fila_procedimentos[3][prioridade]))
                 {
-                    Paciente *proximo_paciente = desenfileira(fila_procedimentos[3][prioridade]);
-                    proximo_paciente->tempo_espera += (relogio - proximo_paciente->hora); // Atualiza o tempo de espera
+                    // Remove o próximo paciente da fila
+                    Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[3][prioridade], relogio);
+
+                    // Aloca a unidade e escalona o término do procedimento
                     aloca_unidade(medicamentos);
-                    insere_evento(escalonador, relogio + medicamentos->tempo_medio * paciente->medidas_hospitalares, 13, proximo_paciente); // Tipo 13: Conclusão
-                    proximo_paciente->estado_atual = 13;                                                                                    // Estado: Realizando instrumentos/medicamentos
+                    insere_evento(escalonador, relogio + medicamentos->tempo_medio * proximo_paciente->instrumentos_medicamentos, 13, proximo_paciente); // Tipo 13: Conclusão
+                    proximo_paciente->estado_atual = 13;                                                                                                 // Estado: Realizando instrumentos/medicamentos
                     break;
                 }
             }

@@ -1,5 +1,5 @@
-#include "tad_paciente.h"
-#include "tad_fila.h"
+#include "tad_paciente_fila.h"
+
 
 // Função para inicializar um paciente
 Paciente* inicializa_paciente(char* id, int alta, int ano, int mes, int dia, int hora, int grau,

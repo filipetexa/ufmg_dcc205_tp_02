@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "tad_fila.h"
+#include "tad_paciente_fila.h"
 
 // Estrutura de Procedimento
 typedef struct {
