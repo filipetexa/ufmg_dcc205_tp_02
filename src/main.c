@@ -160,23 +160,48 @@ void inicializa_pacientes(const char *caminho_arquivo)
 
 int determina_proximo_procedimento(Paciente *paciente)
 {
-    if (paciente->medidas_hospitalares > 0)
+    if (paciente->estado_atual <= 1)
     {
-        return 6; // Estado: Na fila de medidas hospitalares
+        // Se o paciente está no estágio inicial, avalia todos os procedimentos
+        if (paciente->medidas_hospitalares > 0)
+        {
+            return 2; // Estado: Na fila de medidas hospitalares
+        }
+        else if (paciente->testes_laboratorio > 0)
+        {
+            return 3; // Estado: Na fila de testes laboratoriais
+        }
+        else if (paciente->exames_imagem > 0)
+        {
+            return 4; // Estado: Na fila de exames de imagem
+        }
+        else if (paciente->instrumentos_medicamentos > 0)
+        {
+            return 5; // Estado: Na fila para instrumentos/medicamentos
+        }
+        return 14; // Estado: Alta hospitalar
     }
-    else if (paciente->testes_laboratorio > 0)
+    else
     {
-        return 8; // Estado: Na fila de testes laboratoriais
+        // Avança para o próximo procedimento baseado no estado atual
+        if (paciente->estado_atual <= 2 && paciente->medidas_hospitalares > 0)
+        {
+            return 2; // Estado: Na fila de medidas hospitalares
+        }
+        else if (paciente->estado_atual <= 3 && paciente->testes_laboratorio > 0)
+        {
+            return 3; // Estado: Na fila de testes laboratoriais
+        }
+        else if (paciente->estado_atual <= 4 && paciente->exames_imagem > 0)
+        {
+            return 4; // Estado: Na fila de exames de imagem
+        }
+        else if (paciente->estado_atual <= 5 && paciente->instrumentos_medicamentos > 0)
+        {
+            return 5; // Estado: Na fila para instrumentos/medicamentos
+        }
+        return 14; // Estado: Alta hospitalar
     }
-    else if (paciente->exames_imagem > 0)
-    {
-        return 10; // Estado: Na fila de exames de imagem
-    }
-    else if (paciente->instrumentos_medicamentos > 0)
-    {
-        return 12; // Estado: Na fila para instrumentos/medicamentos
-    }
-    return 14; // Estado: Alta hospitalar
 }
 
 /**
@@ -200,34 +225,32 @@ void processa_eventos()
         // Identifica o paciente associado ao evento
         Paciente *paciente = (Paciente *)evento.referencia;
 
+        int proximo_estado;
+
         // Verifica o próximo estado do paciente
         switch (paciente->estado_atual)
         {
-        case 0: // Não chegou ainda ao hospital -> Triagem
+        case 0:
             // Tenta alocar o paciente diretamente em uma unidade de triagem
             if (aloca_unidade(triagem))
             {
-                // Paciente atendido diretamente
-                // Atualiza o tempo de atendimento
-                paciente->tempo_atendimento += triagem->tempo_medio;
 
                 // Escalona o evento para o término da triagem
-                insere_evento(escalonador, relogio + triagem->tempo_medio, 3, paciente); // Tipo 3: Triagem concluída
-                paciente->estado_atual = 3;                                              // Estado: Sendo triado
+                insere_evento(escalonador, relogio + triagem->tempo_medio, 1, paciente);
+                paciente->estado_atual = 1;
             }
             else
             {
                 // Paciente não conseguiu atendimento imediato
                 // Coloca o paciente na fila de triagem
                 paciente_entra_fila(paciente, fila_triagem, relogio);
-                paciente->estado_atual = 2; // Estado: Na fila de triagem
             }
 
             break;
 
-        case 3: // Sendo triado -> Triagem concluída
-            // Atualiza o tempo de atendimento
-            paciente->tempo_atendimento += atendimento->tempo_medio;
+        case 1:
+            // Atualiza o tempo de triagem
+            paciente->tempo_atendimento += triagem->tempo_medio;
 
             // Libera a unidade de triagem
             libera_unidade(triagem, relogio);
@@ -236,14 +259,13 @@ void processa_eventos()
             if (aloca_unidade(atendimento))
             {
                 // Espaço disponível no atendimento: escalona o término do atendimento
-                insere_evento(escalonador, relogio + atendimento->tempo_medio, 5, paciente); // Tipo 5: Atendimento concluído
-                paciente->estado_atual = 5;                                                  // Estado: Sendo atendido
+                insere_evento(escalonador, relogio + atendimento->tempo_medio, 2, paciente); // Tipo 5: Atendimento concluído
+                paciente->estado_atual = 2;                                                  // Estado: Sendo atendido
             }
             else
             {
                 // Sem espaço no atendimento: enfileira o paciente
                 paciente_entra_fila(paciente, fila_atendimento[paciente->grau_urgencia], relogio);
-                paciente->estado_atual = 4; // Estado: Na fila de atendimento
             }
 
             // Verifica se há pacientes aguardando na fila de triagem
@@ -254,13 +276,13 @@ void processa_eventos()
 
                 // Aloca a unidade de triagem e escalona um evento para término
                 aloca_unidade(triagem);
-                insere_evento(escalonador, relogio + triagem->tempo_medio, 3, proximo_paciente); // Tipo 3: Triagem concluída
+                insere_evento(escalonador, relogio + triagem->tempo_medio, 1, proximo_paciente); // Tipo 3: Triagem concluída
                 proximo_paciente->estado_atual = 3;                                              // Estado: Sendo triado
             }
 
             break;
 
-        case 5: // Sendo atendido -> Atendimento concluído
+        case 2:
             // Atualiza o tempo de atendimento
             paciente->tempo_atendimento += atendimento->tempo_medio;
 
@@ -268,7 +290,7 @@ void processa_eventos()
             libera_unidade(atendimento, relogio);
 
             // Determina o próximo estado do paciente
-            int proximo_estado = determina_proximo_procedimento(paciente);
+            proximo_estado = determina_proximo_procedimento(paciente);
 
             if (proximo_estado == 14)
             {
@@ -285,29 +307,48 @@ void processa_eventos()
                 // Seleciona o procedimento e a fila corretos
                 switch (proximo_estado)
                 {
-                case 6: // Medidas hospitalares
+                case 2: // Medidas hospitalares
                     procedimento = medidas;
                     fila_procedimento = fila_procedimentos[0][paciente->grau_urgencia];
                     break;
-                case 8: // Testes laboratoriais
+                case 3: // Testes laboratoriais
                     procedimento = testes;
                     fila_procedimento = fila_procedimentos[1][paciente->grau_urgencia];
                     break;
-                case 10: // Exames de imagem
+                case 4: // Exames de imagem
                     procedimento = imagem;
                     fila_procedimento = fila_procedimentos[2][paciente->grau_urgencia];
                     break;
-                case 12: // Instrumentos/medicamentos
+                case 5: // Instrumentos/medicamentos
                     procedimento = medicamentos;
                     fila_procedimento = fila_procedimentos[3][paciente->grau_urgencia];
                     break;
                 }
 
-                // Calcula o tempo total necessário para o próximo procedimento
-                double tempo_procedimento = procedimento->tempo_medio *
-                                            (proximo_estado == 6 ? paciente->medidas_hospitalares : proximo_estado == 8 ? paciente->testes_laboratorio
-                                                                                                : proximo_estado == 10  ? paciente->exames_imagem
-                                                                                                                        : paciente->instrumentos_medicamentos);
+                // Seta tempo de procedimento baseado no proximo estado
+                double tempo_procedimento;
+
+                if (proximo_estado == 2)
+                {
+                    tempo_procedimento = procedimento->tempo_medio * paciente->medidas_hospitalares;
+                }
+                else if (proximo_estado == 3)
+                {
+                    tempo_procedimento = procedimento->tempo_medio * paciente->testes_laboratorio;
+                }
+                else if (proximo_estado == 4)
+                {
+                    tempo_procedimento = procedimento->tempo_medio * paciente->exames_imagem;
+                }
+                else if (proximo_estado == 5)
+                {
+                    tempo_procedimento = procedimento->tempo_medio * paciente->instrumentos_medicamentos;
+                }
+                else
+                {
+                    // Caso improvável: Se houver algum problema, loga o erro
+                    fprintf(stderr, "Erro: Paciente %s ainda esta em um estado indefinido. Estado atual: %d \n", paciente->identificador, proximo_estado);
+                }
 
                 // Aloca unidade ou coloca na fila
                 if (aloca_unidade(procedimento))
@@ -332,8 +373,8 @@ void processa_eventos()
 
                     // Aloca a unidade de atendimento e escalona o término do atendimento
                     aloca_unidade(atendimento);
-                    insere_evento(escalonador, relogio + atendimento->tempo_medio, 5, proximo_paciente); // Tipo 5: Atendimento concluído
-                    proximo_paciente->estado_atual = 5;                                                  // Estado: Sendo atendido
+                    insere_evento(escalonador, relogio + atendimento->tempo_medio, 2, proximo_paciente); // Tipo 5: Atendimento concluído
+                    proximo_paciente->estado_atual = 2;                                                  // Estado: Sendo atendido
 
                     break; // Sai do loop após encontrar um paciente
                 }
@@ -341,190 +382,111 @@ void processa_eventos()
 
             break;
 
-        case 7: // Realizando medidas hospitalares -> Medidas concluídas
-            // Atualiza o tempo de atendimento
-            paciente->tempo_atendimento += medidas->tempo_medio * paciente->medidas_hospitalares;
+        case 3:
+        case 4:
+        case 5:
+        case 6: // Realizando procedimentos -> Concluído
+            switch (paciente->estado_atual)
+            {
+            case 3: // Realizando medidas hospitalares
+                paciente->tempo_atendimento += medidas->tempo_medio * paciente->medidas_hospitalares;
+                libera_unidade(testes, relogio);
+                break;
+            case 4: // Realizando testes laboratoriais
+                paciente->tempo_atendimento += testes->tempo_medio * paciente->testes_laboratorio;
+                libera_unidade(testes, relogio);
+                break;
 
-            // Libera a unidade de medidas hospitalares
-            libera_unidade(medidas, relogio);
+            case 5: // Realizando exames de imagem
+                paciente->tempo_atendimento += imagem->tempo_medio * paciente->exames_imagem;
+                libera_unidade(imagem, relogio);
+                break;
+
+            case 6: // Realizando instrumentos/medicamentos
+                paciente->tempo_atendimento += medicamentos->tempo_medio * paciente->instrumentos_medicamentos;
+                libera_unidade(medicamentos, relogio);
+                break;
+
+            default:
+                fprintf(stderr, "Erro: Estado inválido do paciente %s.\n", paciente->identificador);
+                break;
+            }
 
             // Determina o próximo estado do paciente
             proximo_estado = determina_proximo_procedimento(paciente);
 
             if (proximo_estado == 14)
             {
-                // Paciente vai para alta
-                paciente->estado_atual = 14; // Estado: Alta hospitalar
-            }
-            else if (proximo_estado == 8)
-            {
-                // Próximo procedimento: Testes laboratoriais
-                if (aloca_unidade(testes))
-                {
-                    // Unidade disponível: Escalona o término do procedimento
-                    insere_evento(escalonador, relogio + testes->tempo_medio * paciente->testes_laboratorio, 9, paciente); // Tipo 9: Testes concluídos
-                    paciente->estado_atual = 9;                                                                            // Estado: Realizando testes laboratoriais
-                }
-                else
-                {
-                    // Unidade indisponível: Enfileira o paciente
-                    paciente_entra_fila(paciente, fila_procedimentos[1][paciente->grau_urgencia], relogio);
-                    paciente->estado_atual = 8; // Estado: Na fila de testes laboratoriais
-                }
-            }
-
-            // Verifica as filas de medidas hospitalares para puxar o próximo paciente
-            for (int prioridade = 0; prioridade < 3; prioridade++)
-            {
-                if (!fila_vazia(fila_procedimentos[0][prioridade]))
-                {
-                    // Remove o próximo paciente da fila
-                    Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[0][prioridade], relogio);
-
-                    // Aloca a unidade e escalona o término do procedimento
-                    aloca_unidade(medidas);
-                    insere_evento(escalonador, relogio + medidas->tempo_medio * proximo_paciente->medidas_hospitalares, 7, proximo_paciente); // Tipo 7: Medidas concluídas
-                    proximo_paciente->estado_atual = 7;                                                                                       // Estado: Realizando medidas hospitalares
-                    break;
-                }
-            }
-
-            break;
-
-        case 9: // Realizando testes laboratoriais -> Testes concluídos
-            // Atualiza o tempo de atendimento
-            paciente->tempo_atendimento += testes->tempo_medio * paciente->testes_laboratorio;
-
-            // Libera a unidade de testes laboratoriais
-            libera_unidade(testes, relogio);
-
-            // Determina o próximo estado do paciente
-            proximo_estado = determina_proximo_procedimento(paciente);
-
-            if (proximo_estado == 14)
-            {
-                // Paciente vai para alta
-                paciente->estado_atual = 14; // Estado: Alta hospitalar
-            }
-            else if (proximo_estado == 10)
-            {
-                // Próximo procedimento: Exames de imagem
-                if (aloca_unidade(imagem))
-                {
-                    // Unidade disponível: Escalona o término do procedimento
-                    insere_evento(escalonador, relogio + imagem->tempo_medio * paciente->exames_imagem, 11, paciente); // Tipo 11: Exames concluídos
-                    paciente->estado_atual = 11;                                                                       // Estado: Realizando exames de imagem
-                }
-                else
-                {
-                    // Unidade indisponível: Enfileira o paciente
-                    paciente_entra_fila(paciente, fila_procedimentos[2][paciente->grau_urgencia], relogio);
-                    paciente->estado_atual = 10; // Estado: Na fila de exames de imagem
-                }
-            }
-
-            // Verifica as filas de testes laboratoriais para puxar o próximo paciente
-            for (int prioridade = 0; prioridade < 3; prioridade++)
-            {
-                if (!fila_vazia(fila_procedimentos[1][prioridade]))
-                {
-                    // Remove o próximo paciente da fila
-                    Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[1][prioridade], relogio);
-
-                    // Aloca a unidade e escalona o término do procedimento
-                    aloca_unidade(testes);
-                    insere_evento(escalonador, relogio + testes->tempo_medio * proximo_paciente->testes_laboratorio, 9, proximo_paciente); // Tipo 9: Testes concluídos
-                    proximo_paciente->estado_atual = 9;                                                                                    // Estado: Realizando testes laboratoriais
-                    break;
-                }
-            }
-
-            break;
-
-        case 11: // Realizando exames de imagem -> Exames concluídos
-            // Atualiza o tempo de atendimento
-            paciente->tempo_atendimento += imagem->tempo_medio * paciente->exames_imagem;
-
-            // Libera a unidade de exames de imagem
-            libera_unidade(imagem, relogio);
-
-            // Determina o próximo estado do paciente
-            proximo_estado = determina_proximo_procedimento(paciente);
-
-            if (proximo_estado == 14)
-            {
-                // Paciente vai para alta
-                paciente->estado_atual = 14; // Estado: Alta hospitalar
-            }
-            else if (proximo_estado == 12)
-            {
-                // Próximo procedimento: Instrumentos/medicamentos
-                if (aloca_unidade(medicamentos))
-                {
-                    // Unidade disponível: Escalona o término do procedimento
-                    insere_evento(escalonador, relogio + medicamentos->tempo_medio * paciente->instrumentos_medicamentos, 13, paciente); // Tipo 13: Conclusão
-                    paciente->estado_atual = 13;                                                                                         // Estado: Realizando instrumentos/medicamentos
-                }
-                else
-                {
-                    // Unidade indisponível: Enfileira o paciente
-                    paciente_entra_fila(paciente, fila_procedimentos[3][paciente->grau_urgencia], relogio);
-                    paciente->estado_atual = 12; // Estado: Na fila de instrumentos/medicamentos
-                }
-            }
-
-            // Verifica as filas de exames de imagem para puxar o próximo paciente
-            for (int prioridade = 0; prioridade < 3; prioridade++)
-            {
-                if (!fila_vazia(fila_procedimentos[2][prioridade]))
-                {
-                    // Remove o próximo paciente da fila
-                    Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[2][prioridade], relogio);
-
-                    // Aloca a unidade e escalona o término do procedimento
-                    aloca_unidade(imagem);
-                    insere_evento(escalonador, relogio + imagem->tempo_medio * proximo_paciente->exames_imagem, 11, proximo_paciente); // Tipo 11: Conclusão
-                    proximo_paciente->estado_atual = 11;                                                                               // Estado: Realizando exames de imagem
-                    break;
-                }
-            }
-
-            break;
-
-        case 13: // Realizando instrumentos/medicamentos -> Procedimento concluído
-            // Atualiza o tempo de atendimento
-            paciente->tempo_atendimento += medicamentos->tempo_medio * paciente->instrumentos_medicamentos;
-
-            // Libera a unidade de instrumentos/medicamentos
-            libera_unidade(medicamentos, relogio);
-
-            // Determina o próximo estado do paciente
-            proximo_estado = determina_proximo_procedimento(paciente);
-
-            if (proximo_estado == 14)
-            {
-                // Paciente vai para alta
+                // Paciente recebeu alta
                 paciente->estado_atual = 14; // Estado: Alta hospitalar
             }
             else
             {
-                // Caso improvável: Se houver algum problema, loga o erro
-                fprintf(stderr, "Erro: Paciente %s ainda possui procedimentos pendentes após o estado 13.\n", paciente->identificador);
-            }
+                // Próximo procedimento necessário
+                Procedimento *procedimento = NULL;
+                Fila *fila_procedimento = NULL;
+                double tempo_procedimento = 0;
+                int quantidade_procedimento = 0; // Variável local para a quantidade
 
-            // Verifica as filas de instrumentos/medicamentos para puxar o próximo paciente
-            for (int prioridade = 0; prioridade < 3; prioridade++)
-            {
-                if (!fila_vazia(fila_procedimentos[3][prioridade]))
+                // Seleciona o procedimento, fila e tempo corretos
+                switch (proximo_estado)
                 {
-                    // Remove o próximo paciente da fila
-                    Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[3][prioridade], relogio);
-
-                    // Aloca a unidade e escalona o término do procedimento
-                    aloca_unidade(medicamentos);
-                    insere_evento(escalonador, relogio + medicamentos->tempo_medio * proximo_paciente->instrumentos_medicamentos, 13, proximo_paciente); // Tipo 13: Conclusão
-                    proximo_paciente->estado_atual = 13;                                                                                                 // Estado: Realizando instrumentos/medicamentos
+                case 2: // Medidas hospitalares
+                    procedimento = medidas;
+                    fila_procedimento = fila_procedimentos[0][paciente->grau_urgencia];
+                    quantidade_procedimento = paciente->medidas_hospitalares;
                     break;
+                case 3: // Testes laboratoriais
+                    procedimento = testes;
+                    fila_procedimento = fila_procedimentos[1][paciente->grau_urgencia];
+                    quantidade_procedimento = paciente->testes_laboratorio;
+                    break;
+                case 4: // Exames de imagem
+                    procedimento = imagem;
+                    fila_procedimento = fila_procedimentos[2][paciente->grau_urgencia];
+                    quantidade_procedimento = paciente->exames_imagem;
+                    break;
+                case 5: // Instrumentos/medicamentos
+                    procedimento = medicamentos;
+                    fila_procedimento = fila_procedimentos[3][paciente->grau_urgencia];
+                    quantidade_procedimento = paciente->instrumentos_medicamentos;
+                    break;
+                default:
+                    fprintf(stderr, "Erro: Próximo estado inválido (%d) para o paciente %s.\n", proximo_estado, paciente->identificador);
+                    break;
+                }
+
+                // Calcula o tempo do próximo procedimento
+                tempo_procedimento = procedimento->tempo_medio * quantidade_procedimento;
+
+                // Aloca unidade ou coloca na fila
+                if (aloca_unidade(procedimento))
+                {
+                    insere_evento(escalonador, relogio + tempo_procedimento, proximo_estado + 1, paciente);
+                    paciente->estado_atual = proximo_estado + 1; // Estado: Realizando o procedimento
+                }
+                else
+                {
+                    paciente_entra_fila(paciente, fila_procedimento, relogio);
+                    paciente->estado_atual = proximo_estado; // Estado: Na fila do procedimento
+                }
+
+                // Determina o índice do procedimento para verificar filas
+                int procedimento_index = proximo_estado - 2;
+
+                for (int prioridade = 0; prioridade < 3; prioridade++)
+                {
+                    if (!fila_vazia(fila_procedimentos[procedimento_index][prioridade]))
+                    {
+                        Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[procedimento_index][prioridade], relogio);
+
+                        aloca_unidade(procedimento);
+                        insere_evento(escalonador, relogio + procedimento->tempo_medio * quantidade_procedimento,
+                                      proximo_paciente->estado_atual + 1, proximo_paciente);
+                        proximo_paciente->estado_atual = proximo_paciente->estado_atual + 1;
+
+                        break;
+                    }
                 }
             }
 
