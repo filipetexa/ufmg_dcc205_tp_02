@@ -35,19 +35,30 @@ void enfileira(Fila* fila, Paciente* paciente) {
 
 // Desenfileira o paciente mais antigo da fila
 Paciente* desenfileira(Fila* fila) {
-    if (fila_vazia(fila)) {
+    if (fila == NULL) {
+        fprintf(stderr, "Erro: Tentativa de desenfileirar de uma fila nula.\n");
         return NULL;
     }
+
+    if (fila_vazia(fila)) {
+        fprintf(stderr, "Erro: Tentativa de desenfileirar de uma fila vazia.\n");
+        return NULL;
+    }
+
     Nodo* nodo_removido = fila->inicio;
     Paciente* paciente = nodo_removido->paciente;
     fila->inicio = nodo_removido->proximo;
+
     if (fila->inicio == NULL) {
-        fila->fim = NULL;
+        fila->fim = NULL; // Fila ficou vazia após a remoção
     }
+
     free(nodo_removido);
     fila->tamanho--;
+
     return paciente;
 }
+
 
 // Verifica se a fila está vazia
 int fila_vazia(Fila* fila) {

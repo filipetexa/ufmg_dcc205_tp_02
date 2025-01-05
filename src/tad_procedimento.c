@@ -35,7 +35,7 @@ void libera_unidade(Procedimento* procedimento, double tempo_duracao) {
         procedimento->unidades_ocupadas--;
         procedimento->tempo_ocupado += tempo_duracao;
     } else {
-        fprintf(stderr, "Erro: Tentativa de liberar unidade inexistente.\n");
+        fprintf(stderr, "Erro: Tentativa de liberar unidade inexistente. procedimento: %s \n", procedimento->nome);
     }
 }
 
