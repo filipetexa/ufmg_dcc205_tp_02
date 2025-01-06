@@ -136,6 +136,11 @@ void inicializa_pacientes(const char *caminho_arquivo)
         exit(EXIT_FAILURE);
     }
 
+    for (int i = 0; i < num_pacientes; i++)
+    {
+        Pacientes[i] = NULL;
+    }
+
     // Lê os dados dos pacientes e inicializa eventos de chegada
     for (int i = 0; i < num_pacientes; i++)
     {
@@ -485,23 +490,76 @@ void processa_eventos()
                 {
                     if (!fila_vazia(fila_procedimentos[procedimento_index][prioridade]))
                     {
+                        // Remove o próximo paciente da fila
                         Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[procedimento_index][prioridade], relogio);
 
-                        proximo_estado = determina_proximo_procedimento(proximo_paciente);
+                        // Determina o estado do próximo paciente
+                        int estado_proximo_paciente = determina_proximo_procedimento(proximo_paciente);
 
-                        aloca_unidade(procedimento);
-                        insere_evento(escalonador, relogio + procedimento->tempo_medio * quantidade_procedimento,
-                                      proximo_estado, proximo_paciente);
+                        if (estado_proximo_paciente == 14)
+                        {
+                            // Paciente recebeu alta
+                            proximo_paciente->estado_atual = 14; // Estado: Alta hospitalar
+                        }
+                        else
+                        {
+                            // Determina o procedimento, fila, tempo e quantidade para o próximo paciente
+                            Procedimento *procedimento_proximo_paciente = NULL;
+                            Fila *fila_procedimento_proximo_paciente = NULL;
+                            double tempo_procedimento_proximo_paciente = 0;
+                            int quantidade_procedimento_proximo_paciente = 0;
 
-                        proximo_paciente->estado_atual = proximo_estado;
+                            switch (estado_proximo_paciente)
+                            {
+                            case 3: // Medidas hospitalares
+                                procedimento_proximo_paciente = medidas;
+                                fila_procedimento_proximo_paciente = fila_procedimentos[0][proximo_paciente->grau_urgencia];
+                                quantidade_procedimento_proximo_paciente = proximo_paciente->medidas_hospitalares;
+                                break;
+                            case 4: // Testes laboratoriais
+                                procedimento_proximo_paciente = testes;
+                                fila_procedimento_proximo_paciente = fila_procedimentos[1][proximo_paciente->grau_urgencia];
+                                quantidade_procedimento_proximo_paciente = proximo_paciente->testes_laboratorio;
+                                break;
+                            case 5: // Exames de imagem
+                                procedimento_proximo_paciente = imagem;
+                                fila_procedimento_proximo_paciente = fila_procedimentos[2][proximo_paciente->grau_urgencia];
+                                quantidade_procedimento_proximo_paciente = proximo_paciente->exames_imagem;
+                                break;
+                            case 6: // Instrumentos/medicamentos
+                                procedimento_proximo_paciente = medicamentos;
+                                fila_procedimento_proximo_paciente = fila_procedimentos[3][proximo_paciente->grau_urgencia];
+                                quantidade_procedimento_proximo_paciente = proximo_paciente->instrumentos_medicamentos;
+                                break;
+                            default:
+                                fprintf(stderr, "Erro: Estado inesperado %d para o paciente %s\n", estado_proximo_paciente, proximo_paciente->identificador);
+                                continue;
+                            }
 
-                        break;
+                            // Calcula o tempo do próximo procedimento
+                            tempo_procedimento_proximo_paciente = procedimento_proximo_paciente->tempo_medio * quantidade_procedimento_proximo_paciente;
+
+                            // Verifica disponibilidade no procedimento ou insere na fila
+                            if (aloca_unidade(procedimento_proximo_paciente))
+                            {
+                                // Insere evento no escalonador
+                                insere_evento(escalonador, relogio + tempo_procedimento_proximo_paciente, estado_proximo_paciente, proximo_paciente);
+                                proximo_paciente->estado_atual = estado_proximo_paciente; // Atualiza estado do paciente
+                            }
+                            else
+                            {
+                                // Insere o paciente na fila do próximo procedimento
+                                paciente_entra_fila(proximo_paciente, fila_procedimento_proximo_paciente, relogio);
+                                proximo_paciente->estado_atual = estado_proximo_paciente; // Atualiza estado do paciente
+                            }
+
+                            break; // Sai do loop após processar o paciente
+                        }
                     }
                 }
             }
 
             break;
-            
         case 14:
             break;
 
@@ -612,10 +670,6 @@ int main(int argc, char *argv[])
     finaliza_procedimento(medicamentos);
 
     // Libera o array de pacientes
-    for (int i = 0; i < num_pacientes; i++)
-    {
-        libera_paciente(Pacientes[i]);
-    }
     free(Pacientes);
 
     return 0;
