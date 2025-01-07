@@ -1,6 +1,6 @@
 # Variáveis para o compilador e as opções de compilação
 CC = gcc
-CFLAGS = -Wall -g -Iinclude
+CFLAGS = -Wall -g -Iinclude 
 
 # Nome do arquivo executável e caminhos de diretórios
 EXECUTABLE = tp2.out
@@ -22,7 +22,7 @@ all: $(EXEC_PATH)
 # Como construir o executável final
 $(EXEC_PATH): $(OBJECTS)
 	@mkdir -p bin
-	$(CC) $(OBJECTS) -o $@
+	$(CC) $(OBJECTS) -o $@ -lm
 
 # Como construir cada arquivo objeto
 $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c

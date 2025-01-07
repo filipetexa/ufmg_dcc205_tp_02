@@ -239,6 +239,20 @@ void processa_eventos()
 
         int proximo_estado;
 
+
+        if (strcmp(paciente->identificador, "0009600008") == 0)
+        {
+            // É o paciente 0009600008
+            printf("Paciente encontrado!\n");
+        }
+        else
+        {
+            // Não é o paciente 0009600008
+            printf("Não é o paciente 0009600008.\n");
+        }
+        /*
+        */
+
         // Verifica o próximo estado do paciente
         switch (paciente->estado_atual)
         {
@@ -248,7 +262,7 @@ void processa_eventos()
             {
 
                 // Escalona o evento para o término da triagem
-                insere_evento(escalonador, relogio + triagem->tempo_medio, 1, paciente);
+                insere_evento(escalonador, relogio + triagem->tempo_medio, 0, paciente);
                 paciente->estado_atual = 1;
             }
             else
@@ -271,8 +285,8 @@ void processa_eventos()
             if (aloca_unidade(atendimento))
             {
                 // Espaço disponível no atendimento: escalona o término do atendimento
-                insere_evento(escalonador, relogio + atendimento->tempo_medio, 2, paciente); // Tipo 5: Atendimento concluído
-                paciente->estado_atual = 2;                                                  // Estado: Sendo atendido
+                insere_evento(escalonador, relogio + atendimento->tempo_medio, paciente->grau_urgencia, paciente); // Tipo 5: Atendimento concluído
+                paciente->estado_atual = 2;                                                                        // Estado: Sendo atendido
             }
             else
             {
@@ -288,8 +302,8 @@ void processa_eventos()
 
                 // Aloca a unidade de triagem e escalona um evento para término
                 aloca_unidade(triagem);
-                insere_evento(escalonador, relogio + triagem->tempo_medio, 1, proximo_paciente); // Tipo 3: Triagem concluída
-                proximo_paciente->estado_atual = 1;                                              // Estado: Sendo triado
+                insere_evento(escalonador, relogio + triagem->tempo_medio, paciente->grau_urgencia, proximo_paciente); // Tipo 3: Triagem concluída
+                proximo_paciente->estado_atual = 1;                                                                    // Estado: Sendo triado
             }
 
             break;
@@ -365,7 +379,7 @@ void processa_eventos()
                 // Aloca unidade ou coloca na fila
                 if (aloca_unidade(procedimento))
                 {
-                    insere_evento(escalonador, relogio + tempo_procedimento, proximo_estado + 1, paciente);
+                    insere_evento(escalonador, relogio + tempo_procedimento, paciente->grau_urgencia, paciente);
                     paciente->estado_atual = proximo_estado; // Estado: Realizando o procedimento
                 }
                 else
@@ -385,8 +399,8 @@ void processa_eventos()
 
                     // Aloca a unidade de atendimento e escalona o término do atendimento
                     aloca_unidade(atendimento);
-                    insere_evento(escalonador, relogio + atendimento->tempo_medio, 2, proximo_paciente); // Tipo 5: Atendimento concluído
-                    proximo_paciente->estado_atual = 2;                                                  // Estado: Sendo atendido
+                    insere_evento(escalonador, relogio + atendimento->tempo_medio, paciente->grau_urgencia, proximo_paciente); // Tipo 5: Atendimento concluído
+                    proximo_paciente->estado_atual = 2;                                                                        // Estado: Sendo atendido
 
                     break; // Sai do loop após encontrar um paciente
                 }
@@ -474,7 +488,7 @@ void processa_eventos()
                 // Aloca unidade ou coloca na fila
                 if (aloca_unidade(procedimento))
                 {
-                    insere_evento(escalonador, relogio + tempo_procedimento, proximo_estado, paciente);
+                    insere_evento(escalonador, relogio + tempo_procedimento, paciente->grau_urgencia, paciente);
                     paciente->estado_atual = proximo_estado; // Estado: Realizando o procedimento
                 }
                 else
@@ -484,7 +498,7 @@ void processa_eventos()
                 }
 
                 // Determina o índice do procedimento para verificar filas
-                int procedimento_index = proximo_estado - 3;
+                int procedimento_index = proximo_estado - 4;
 
                 for (int prioridade = 0; prioridade < 3; prioridade++)
                 {
@@ -494,8 +508,7 @@ void processa_eventos()
                         Paciente *proximo_paciente = paciente_sai_fila(fila_procedimentos[procedimento_index][prioridade], relogio);
 
                         // Determina o estado do próximo paciente
-                        int estado_proximo_paciente = determina_proximo_procedimento(proximo_paciente);
-
+                        int estado_proximo_paciente = proximo_paciente->estado_atual;
                         if (estado_proximo_paciente == 14)
                         {
                             // Paciente recebeu alta
@@ -543,7 +556,7 @@ void processa_eventos()
                             if (aloca_unidade(procedimento_proximo_paciente))
                             {
                                 // Insere evento no escalonador
-                                insere_evento(escalonador, relogio + tempo_procedimento_proximo_paciente, estado_proximo_paciente, proximo_paciente);
+                                insere_evento(escalonador, relogio + tempo_procedimento_proximo_paciente, proximo_paciente->grau_urgencia, proximo_paciente);
                                 proximo_paciente->estado_atual = estado_proximo_paciente; // Atualiza estado do paciente
                             }
                             else
@@ -643,7 +656,7 @@ int main(int argc, char *argv[])
     carrega_parametros(argv[1]);
 
     // Inicializa as estruturas baseadas nos parâmetros lidos
-    escalonador = inicializa_escalonador(2 * num_pacientes);
+    escalonador = inicializa_escalonador(num_pacientes);
 
     // Inicializa os procedimentos
     triagem = inicializa_procedimento("Triagem", tempos[0], unidades[0]);
