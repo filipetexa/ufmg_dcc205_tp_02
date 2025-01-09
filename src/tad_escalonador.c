@@ -1,5 +1,13 @@
 #include "tad_escalonador.h"
 
+
+/*
+Vamos implementar uma priorização entre eventos que tem o mesmo horario
+A proposta do professor é que seja feito pelo ID do paciente.
+
+Ou seja quem tem o menor ID deve ser priorizado
+*/
+
 // Troca dois eventos no array
 static void troca_eventos(Evento* a, Evento* b) {
     Evento temp = *a;
