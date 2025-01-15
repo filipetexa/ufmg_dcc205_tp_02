@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/tp2.out",
-            "args": ["/home/filipe/ufmg/algoritimos-estruturas-de-dados/ufmg_dcc205_tp_02/test/test-7.csv"],
+            "args": ["/home/filipe/ufmg/algoritimos-estruturas-de-dados/ufmg_dcc205_tp_02/test/exemplo1.csv"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
